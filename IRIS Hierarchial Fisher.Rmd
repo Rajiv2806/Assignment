@@ -1,0 +1,293 @@
+---
+title: "IRIS - HIERARCHIAL FISHER"
+author: "Rajiv"
+date: "24 July 2017"
+output: html_document
+---
+
+## Fisher Discriminant Analysis on IRIS Dataset 
+
+Fisher Discriminant Analysis or Linear Discriminant Analysis(LDA) is used to Seperate classes from each other.
+
+LDA is used to reduce the Dimensionality of the dataset as like Principle Component Analysis(PCA).
+
+The main distinction between LDA and PCA is, PCA does not take into account of class labels and tries to maximize the variance across the dataset, it mostly works in Numeric datasets. In LDA the main objective is to sepearte the two classes with a straingt line such that the within variance of that class is less and between varaince is more.
+
+PCA is an "Unsupervised" Machine Learning Algorithm and LDA is "Supervised" Classification Machine Learning Algorithm.
+
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+
+In this document we are going to explain the Fisher Linear Discriminant Analysis with the help of IRIS dataset
+
+Iris Dataset has five features: sepal.length, sepal.width, petal.length, petal.width, Species. First four columns are the numerical features defining the different attributes of the 3 sets/classes of flowers Species  namely: Setosa, Versicolor, Virginica.
+
+Note: The original Dataset of IRIS is of 150 X 5 dimensions. In this document the training and test sets are sampled and pre defined. 
+
+
+*STEP-1*: 
+
+Loading the Training and Test Datasets from Github repository
+
+```{r, message=FALSE, warning=FALSE}
+rm(list=ls())
+
+library(RCurl)
+
+Iris_train_url = "https://raw.githubusercontent.com/Rajiv2806/IRIS-Dataset/master/train.csv"
+Iris_train <- read.table(text = getURL(Iris_train_url),header = T,sep=",")
+
+Iris_test_url = "https://raw.githubusercontent.com/Rajiv2806/IRIS-Dataset/master/test.csv"
+Iris_test <- read.table(text = getURL(Iris_test_url),header = T,sep=",")
+
+rm(Iris_train_url,Iris_test_url)
+```
+(I will keep removing the variables from workspace that will not be necessary anymore, Just to keep the workspace clean)
+
+
+Removing the first Column which is an indicator variable in the above file.
+
+```{r}
+cat("Loaded Dimension of IRIS Training Data set:",dim(Iris_train))
+Iris_train <- Iris_train[,2:6]
+cat("\nNow Dimension of IRIS Training Data set:",dim(Iris_train))
+
+cat("\nLoaded Dimension of IRIS Test Data set:",dim(Iris_test))
+Iris_test <- Iris_test[,2:6]
+cat("\nNow Dimension of IRIS Testing Data set:",dim(Iris_test))
+```
+
+
+
+Looking at the sample dataset
+
+```{r}
+head(Iris_train)
+```
+
+
+*Step-2* 
+
+Vizualizing the data using scatter plot across different dimensions and colour coded by Species
+
+We can clearly see, from the below plots that the species "Setosa" (Colour coded Red) is different from the other species "Versicolor" and "Virginica" (Colour coded Green and Blue respectively).
+
+
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
+
+a <- ggplot(Iris_train,aes(x=Sepal.Length,y=Petal.Width )) + geom_point(aes(color = Species)) 
+b <- ggplot(Iris_train,aes(x=Petal.Length,y=Petal.Width )) + geom_point(aes(color = Species))
+
+library(gridExtra)
+grid.arrange(a,b,ncol=2)
+rm(a,b)
+```
+
+
+*Step-3:*
+
+Lets consider the two similar classes: Versicolor and Virginica as a single class - "Class4" and Setosa as "Class3" and lets call it a MetaClass. This is done in Training dataset only.
+
+```{r}
+Iris_train$MetaClass <- as.character(Iris_train$Species)
+
+p <- c("versicolor","virginica")
+
+Iris_train[Iris_train$Species %in% p,]$MetaClass <- "Class4"
+Iris_train[!Iris_train$Species %in% p,]$MetaClass <- "Class3"
+
+head(Iris_train)
+```
+
+There are 26 observations in Class3 and 71 observations in Class4
+
+```{r}
+table(Iris_train$MetaClass)
+```
+
+#Fisher Projection of Class3 Vs Class4 
+
+*Step-4:*  
+Lets try to seperate Class3 from Class4 using Fisher Projection.
+
+Here "MetaClass" is our Y/Dependant variable and we run the LDA on the rest of the four numeric X's/explanatory variables.
+
+
+```{r}
+library(MASS)
+model1 <- lda(MetaClass~.,data = Iris_train[,-c(5)])
+model1
+```
+
+
+The value of ratio of **between class variation to within calss variation** (the Fisher discriminat value) for the models and the scaling values across the 4 dimensions are given below.
+
+```{r}
+model1$svd
+model1$scaling
+```
+
+
+
+Below are some parameters that can be used to analyse the above model in detail.
+
+```{r, message=FALSE, warning=FALSE}
+#names(model1); model1$prior; model1$counts; model1$means; model1$scaling; model1$lev; model1$svd
+#model1$N; model1$call; model1$terms
+```
+
+Validating if the model has correctly distingusihed Class3 & Class4 of MetaClass
+
+We are doing this only on Training dataset and we are seperating 2 Classes in this exercise.
+
+As we can see from the below output, we have classified all the 97 observations correctly and our Misclassification ratio is 0% (Zero Percent).
+
+```{r}
+Model1_Predict_Train <- predict(model1,newdata = Iris_train[1:4])$class
+cat("No of correctly predicted Classes by model1 are:",sum(Iris_train$MetaClass == Model1_Predict_Train), "out of", nrow(Iris_train))
+```
+
+
+Plotting the data on newly obtained features we can see both of the classes are clearly seperated.
+
+We are able to reduce the original 4 dimensions into 1 dimension with clear seperation of the 2 classes.
+(If we draw an Horizantal line parallel to the X axis we can clearly seperate both the classes).
+
+```{r}
+projecteddata <- as.matrix(Iris_train[,1:4])%*%model1$scaling
+plot(projecteddata,col = gsub("Class","",Iris_train[,6]))
+rm(projecteddata)
+```
+
+
+The below plot will give you the LDA Projection of two classes across different dimensions in a detailed way.
+
+```{r, message=FALSE, warning=FALSE}
+library(klaR)
+Iris_train$MetaClass <- as.factor(Iris_train$MetaClass)
+partimat(MetaClass~.,data=Iris_train[,-c(5)],method="lda", main = "Fisher Projection of Class3 Vs Class4") 
+```
+
+# Fisher Projection on two similar classes: Versicolor and virginica
+
+*Step-5:* 
+
+We've seen that LDA is clearly able to sepetate the two distinct classes without no error.
+
+In this step we will try to discriminate 2 similar classes "Versicolor","Virginica" using the fisher LDA and test the accuracy.
+
+```{r, message=FALSE, warning=FALSE}
+#Filtering out only the two species: Versicolor and Virginica.
+Iris_train_2 <- Iris_train[Iris_train$Species %in% p,]
+model2 <- lda(Species~.,data = Iris_train_2[-c(6)])
+model2
+```
+
+The Ratio of between group variation and Within group variation (Called the Fisher Discriminat value) and the scaling values across 4 dimensions provided by the model can be infered from below.
+
+```{r}
+model2$svd
+model2$scaling
+```
+
+
+Validating the model with the training data.
+
+We can see that the Misclassification ratio is about 4%, which is more than the above model ( 0% ) which was seperating very distinct obserations.
+
+So, our Linear model is clearly not able to seperate all the data points, but sepearts most of them. 
+
+```{r}
+model2_Predict_Train <- predict(model2,Iris_train_2[1:4])$class
+cat("No of correctly predicted Classes by model1 are:\n",sum(model2_Predict_Train == Iris_train_2$Species), "out of ", nrow(Iris_train_2))
+
+cat("\n Misclassifaction ratio:", ((nrow(Iris_train_2)-sum(model2_Predict_Train == Iris_train_2$Species))/nrow(Iris_train_2))*100)
+```
+
+If we draw an horizantal axis parallel to the x-axis there are few data points lying on both sides of the line.
+
+```{r}
+projecteddata <- as.matrix(Iris_train_2[,1:4])%*%model2$scaling
+plot(projecteddata,col = Iris_train_2[,5])
+```
+
+
+A Partimat plot from the Klar library for the model2 of the treaining data can be seen in the below graph.
+
+```{r, message=FALSE, warning=FALSE}
+partimat(Species~.,data=Iris_train_2[c(1:5)],method="lda", main = "Fisher Projections on Versicolor and Virginica")
+```
+
+# Fisher Discriminant on the Entire Iris Data
+
+*Step-6:* Till now we tried to descriminate only two classes using LDA. Now we will take all the 3 classes together and try to do an LDA on that.
+
+
+```{r}
+model3 <- lda(Species~.,data = Iris_train[-c(6)])
+model3
+```
+
+Since we have 3 classes in this case, we need to have atleast 2 lines to distingusih both the classes.
+
+Below are the fisher discriminants and the scaling values of these two dimensions.
+```{r}
+model3$svd
+model3$scaling
+```
+
+
+
+The Misclassification score of the model on Training data on these two projections is 3%
+
+```{r}
+model3_Predict_Train <- predict(model3,Iris_train[1:4])$class
+cat("No of correctly predicted Classes by model3 are:\n",sum(model3_Predict_Train == Iris_train$Species), "out of ", nrow(Iris_train))
+
+cat("\n Misclassifaction ratio of training Data:", ((nrow(Iris_train)-sum(model3_Predict_Train == Iris_train$Species))/nrow(Iris_train))*100)
+```
+
+
+The misclassfication ratio of the Test data is much lower than Training data which is 0 (Zero) in this case.
+
+```{r}
+model3_Predict_Test <- predict(model3,Iris_test[1:4])$class
+cat("No of correctly predicted Classes by model3 are:\n",sum(model3_Predict_Test == Iris_test$Species), "out of ", nrow(Iris_test))
+
+cat("\n Misclassifaction ratio of Testing Data:", ((nrow(Iris_test)-sum(model3_Predict_Test == Iris_test$Species))/nrow(Iris_test))*100)
+```
+
+Below are the plots for the training and testing data on the two projections classifing the 3 classes.
+
+```{r}
+projecteddata <- as.matrix(Iris_train[,1:4])%*%model3$scaling
+plot(projecteddata,col = Iris_train[,5],main = "LDA Projections on Training Data")
+projecteddata <- as.matrix(Iris_test[,1:4])%*%model3$scaling
+plot(projecteddata,col = Iris_test[,5],main = "LDA Projection on Testing Data")
+```
+
+The Partimat plots for the training and testing datasets across various combinations of dataset is shown below.
+
+```{r}
+partimat(Species~.,data=Iris_train[c(1:5)],method="lda",main = "Fisher Projections on TestingData set")
+partimat(Species~.,data=Iris_test[c(1:5)],method="lda",main = "Fisher Projections on TestData set")
+```
+
+
+-------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
+
+To classify a dataset with k classes and d dimensions, we need atleast min(k-1,d) Linear discriminants.
+
+We have seen from the scatter plots that the two similar classes are Versicolor and Virginica. Setosa is different from the other two species.
+
+*In Model1: after combining the two similar classes (Versicolor and Virginica) as class4 and Setosa as class3, and applying LDA on the data, we have seen that the model has predicted all the classes correctly and the misclassification ratio is 0% in this case. *
+
+
+*In Model2: on trying to classify the two similar species: Versicolor and Virginica, The misclassfication ratio is around 4.5%. So, from Model1 and Model2 we can see the clear distinction of Setosa with other calsses and Virginica and Versicolor are little similar in nature, as few data points have been classified worngly.*
+
+
+*In Model3: Upon applying LDA in the Training dataset on all the 3 classes we obtained 2 liner discriminants. The Training and Test Misclassifications are 3% and 0% respectively.*
+
+From this exercise have reduced the 4 dimensions into 2 dimensions and on this tried to classify the species based in these 2 new dimensions obtained from LDA process.
